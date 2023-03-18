@@ -18,7 +18,7 @@ server_info = {
 }
 
 @bot.command()
-async def server(ctx, num):
+async def get_server_info(ctx, num):
     if int(num) not in server_info.keys():
         await ctx.send('Invalid server number. Please select a number between 1 and 9.')
     else:
