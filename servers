@@ -1,0 +1,77 @@
+import discord
+import requests
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime, timedelta
+
+# Enter your ARK server's IP address and port number
+server_ip = "your_server_ip_address"
+server_port = "your_server_port"
+
+# Construct the URLs for the ARK Server API
+players_api_url = f"http://{server_ip}:{server_port}/players.json"
+server_api_url = f"http://{server_ip}:{server_port}/server.json"
+
+# Initialize the Discord client
+client = discord.Client()
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user.name}")
+
+@client.event
+async def on_message(message):
+    if message.content.startswith("/"):
+        # Split the message into the command and the player name or ID
+        args = message.content.split()
+        command = args[0][1:].lower() # remove the leading slash and convert to lowercase
+        player_info = " ".join(args[1:])
+        
+        if command == "steam":
+            # Construct the URL for the ARK Server API to retrieve player info by Steam name
+            api_url = f"{players_api_url}?name={player_info}"
+        elif command == "epic":
+            # Construct the URL for the ARK Server API to retrieve player info by Epic Games name
+            api_url = f"{players_api_url}?epicName={player_info}"
+        elif command == "id":
+            # Construct the URL for the ARK Server API to retrieve player info by implant ID
+            api_url = f"{players_api_url}?implantId={player_info}"
+        else:
+            await message.channel.send(f"Invalid command: {command}")
+            return
+        
+        # Send a request to the ARK Server API
+        response = requests.get(api_url)
+
+        # Parse the JSON response into a Python dictionary
+        data = json.loads(response.text)
+
+        # Check if the player is on the server
+        if len(data["players"]) > 0:
+            player = data["players"][0]
+            current_server = player["serverName"]
+            previous_servers = [server["serverName"] for server in player["previousServerNames"]]
+            server_list = "\n".join(previous_servers)
+            message_text = f"{player_info} is on server {current_server}\nPrevious servers:\n{server_list}"
+            
+            # Send a request to the ARK Server API to retrieve server info
+            server_response = requests.get(server_api_url)
+            server_data = json.loads(server_response.text)
+            player_count = server_data["numPlayers"]
+            player_activity = server_data["playerActivity"]
+            
+            # Create a graph of player activity over the past 24 hours
+            activity_times = [datetime.now() - timedelta(hours=i) for i in range(24)]
+            activity_counts = [0] * 24
+            for activity in player_activity:
+                activity_time = datetime.fromisoformat(activity["time"]).replace(tzinfo=None)
+                activity_count = activity["count"]
+                for i in range(24):
+                    if activity_time >= activity_times[i] and activity_time < activity_times[i] + timedelta(hours=1):
+                        activity_counts[i] += activity_count
+                        break
+            
+            # Plot the graph using matplotlib
+            fig, ax = plt.subplots()
+            ax.plot(activity_times
